@@ -102,6 +102,10 @@ if __name__ == "__main__":
     parser.add_argument(
         '--seed', dest='seed', type=int, default=42
     )
+    parser.add_argument(
+        '--save', dest='save', action='store_true',
+        help='if included, saves the figure'
+    )
     args = parser.parse_args()
     # Initialize time
     starttime = time.time() 
@@ -111,15 +115,15 @@ if __name__ == "__main__":
     # Compute 2D fractional Brownian motion 
     Z = fBm.midpoint(args.maxlevel, args.sigma, args.H)
     computation_time = time.time() - starttime 
-    print("Computation finished of %(N)ix%(N)i lattice, elapsed time: %(time).4fs"%{
-        'N': 2**args.maxlevel+1, 'time': computation_time}
+    print("Computation finished for %(N)ix%(N)i lattice with H=%(Hurst).3f, elapsed time: %(time).4fs"%{
+        'N': 2**args.maxlevel+1, 'Hurst': args.H, 'time': computation_time}
     )
 
     # Plot
-    fractions = [0.05, 0.25, 0.5, 0.75]
-    fig, ax = plt.subplots(1, len(fractions), figsize=(4*len(fractions),4))
+    fractions = [0.15, 0.5, 0.85]
+    fig, ax = plt.subplots(1, len(fractions), figsize=(3*len(fractions),3), tight_layout=True)
     # Determine point at which a specified fraction of the environment is filled
-    Z = Z + np.min(Z)                       # Shift
+    Z = Z + abs(np.min(Z))                  # Shift
     Zsort = np.sort(Z.flatten())            # Flatten & sort
     N = len(Zsort)  
     for i, f in enumerate(fractions):
@@ -130,10 +134,17 @@ if __name__ == "__main__":
         # Plot
         ax[i].imshow(Zplot, cmap='Greys', interpolation='none')
         # Limits, labels, etc
-        L = np.sqrt(N)
-        ax[i].set_xlim(0, np.sqrt(N))
-        ax[i].set_ylim(0, np.sqrt(N))
+        ax[i].text(0.5,1.05, r'f=%.2f'%(f), ha='center', fontsize=11, transform=ax[i].transAxes)
+        if i == 0:
+            ax[i].set_ylabel(r'H=%.2f'%(args.H), fontsize=11)
+        L = np.sqrt(N)-1
+        ax[i].set_xlim(0, L)
+        ax[i].set_ylim(0, L)
         ax[i].set_xticks([0,L]);    ax[i].set_xticklabels([r'0', r'L'])
         ax[i].set_yticks([0,L]);    ax[i].set_yticklabels([r'', r'L'])
-    plt.show()
+
+    if args.save:
+        fig.savefig('figures/landscape_H%.2f.png'%(args.H))
+    else:
+        plt.show()
 
