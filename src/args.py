@@ -1,0 +1,37 @@
+""" Collect arguments """
+import argparse
+import numpy as np 
+
+class Args():
+    def __init__(self):
+        parser = argparse.ArgumentParser("Specify specific variables")
+        ## Add arguments
+        # Algorithm variables
+        parser.add_argument(
+            '--m', dest='maxlevel', type=int, default=8,
+            help='maximum level of resolution as N=2**maxlevel'
+        )
+        parser.add_argument(
+            '--sig', dest='sigma', type=float, default=1.,
+            help='variance of the Gaussian distribution'
+        )
+        parser.add_argument(
+            '--H', dest='H', type=float, default=0.5, help='Hurst exponent'
+        )
+        # Random number variables
+        parser.add_argument(
+            '--seed', dest='seed', type=int, default=420
+        )
+        # Boolean variables
+        parser.add_argument(
+            '--save', dest='save', action='store_true',
+            help='if included, saves the figure'
+        )
+        # Directory variables 
+        parser.add_argument(
+            '--ddir', dest='ddir', type=str, default='data/',
+            help='specify directory for output data'
+        )
+        
+        # Parse arguments
+        self.args = parser.parse_args()
