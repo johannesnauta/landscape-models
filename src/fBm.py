@@ -176,37 +176,30 @@ def nb_getvariogram(X, K, nbins):
     """ Get the variogram by random sampling """ 
     N, _ = X.shape 
     maxdist = N / np.sqrt(2) 
-    dx = maxdist / nbins
+    dx = np.int64(maxdist / nbins)
+    distance_ax = np.zeros(nbins)
     # Allocate 
-    elements_in_ring = np.zeros(nbins)
     variogram = np.zeros(nbins)
-    for k in range(K):
-        # Select two random (different) elements 
-        i, j = np.random.randint(N), np.random.randint(N)
-        k, l = np.random.randint(N), np.random.randint(N)
-        while k==i and l==j:
-            k, l = np.random.randint(N), np.random.randint(N)
-        # Compute distance between two elements
-        dist = np.abs(np.array([i-k, j-l]))
-        dist = np.where(dist > 0.5*N, dist-N, dist)
-        dist = np.sqrt(np.sum(dist**2))
-        # Compute index within variogram
-        bin_idx = int(dist // dx)
-        elements_in_ring[bin_idx] += 1
-        # Compute variogram 
-        variogram[bin_idx] += (X[i,j] - X[k,l])**2
-    
-    # Normalize 
     for b in range(nbins):
-        if elements_in_ring[b]:
-            variogram[b] /= elements_in_ring[b]
-    return variogram
+        distance_ax[b] = b * dx
+        sq_distance = np.zeros(K)
+        for k in range(K):
+            # Select random (different) elements 
+            i, j = np.random.randint(N), np.random.randint(N)
+            # Compute variogram 
+            sq_distance[k] = abs(X[i,j] - X[(i+b*dx)%N,j])**2
+        variogram[b] = np.mean(sq_distance)
+    return variogram, distance_ax
 
 @jit(nopython=True, cache=True)
 def nb_getvariogram_(X, dx, nbins, M, K):
     """ Get the variogram of X by sampling 
         Assumes lattice points are equally spaced and seperated by a unit of size dx
         Assumes periodic boundary conditions
+
+        @TODO:  Ensure that this implementation correctly handles the averages
+                of the distances with lattice points within the ring ... 
+        @TODO:  Compute absolute distance, distance squared, mean, ...?
     """ 
     N, _ = X.shape      # Number of lattice points
     L = N*dx            # Length of the environment the lattice represents
@@ -232,14 +225,16 @@ def nb_getvariogram_(X, dx, nbins, M, K):
     # Allocate 
     variogram = np.zeros(nbins, dtype=np.float32)
     for b in range(1,nbins):
-        hmin = (b-1)*delta 
+        sq_difference = np.zeros(M*K)       # Square of the difference
+        hmin = (b-1)*delta                  # 
         hmax = b*delta 
-        distance_ax[b] = hmax
+        distance_ax[b] = (hmax-hmin) / 2
         # Gather indices for which hmin <= distance <= hmax 
         indices = np.where((distances>hmin)*(distances<=hmax))[0]
         K = min(K, len(indices))
         # Sample X at M different locations
         loc_idxs = np.random.choice(np.arange(N*N), size=M, replace=False)
+        z = 0
         for m in range(M):
             i, j = lattice[loc_idxs[m]]
             # Some weird things going on with 1D indices, so fix that
@@ -255,35 +250,46 @@ def nb_getvariogram_(X, dx, nbins, M, K):
                 # Compute variance
                 for sidx in samp_idx:
                     si, sj = lattice[sidx]
-                    variogram[b] += (X[i,j] - X[si,sj])**2 / len(indices)
+                    sq_difference[z] = abs(X[i,j] - X[si,sj])
+                    z += 1
             else:
                 variogram[b] = -1       # No data points at specified distance
+        # Compute variogram 
+        variogram[b] = np.std(sq_difference)**2
     return variogram, distance_ax
 
+@jit(nopython=True, cache=True)
+def nb_sanity_check(X, K, dx):
+    # N, _ = X.shape 
+    N = len(X)
+    valid_idx = np.array([i for i in range(dx,N-dx)])
+    K = min(K, len(valid_idx))
+    increments = np.zeros(K)
+    idx = np.random.choice(valid_idx, size=K)
+    # var = np.zeros(4*K)
+    for k in range(K):
+        # Sample random lattice point 
+        i = idx[k]
+        increments[k] = X[i]-X[i+dx]
 
+        # i, j = np.random.randint(N), np.random.randint(N) 
+        # S = (X[i,j] - np.array([
+        #     [X[(i-dx)%N,j]],
+        #     [X[(i+dx)%N,j]],
+        #     [X[i,(j-dx)%N]],
+        #     [X[i,(j+dx)%N]]            
+        # ])) ** 2 
+        # var[4*k:4*(k+1)] = S.flatten()
+    Mean = np.mean(increments)
+    Var = np.std(increments)**2
+    return Mean, Var 
 
 @jit(nopython=True, cache=True)
-def nb_getVariance2D(X):
-    """ Get the variance of a two-dimensional fractional Brownian process 
-        Returns a one-dimensional array with the variance based on the 
-        (Euclidean) distance between two elements, as it is know it should
-        only depend on the distance (and the Hurst exponent)
-    """
-    N, _ = X.shape      # Extract number of lattice points 
-    # Initialize 
-    maxdist = np.sqrt(2) * N 
-    # Allocate 
-    Var = np.zeros((N,N), dtype=np.float32)
-    # Compute variance
-    for n in range(N):
-        for m in range(n, N):
-            element = (1/(N-1)) * np.sum(
-                (X[n,:] - np.mean(X[n,:])) * (X[m,:] - np.mean(X[m,:]))
-            ) 
-            Var[n,m] = element 
-            Var[m,n] = element 
-    return Var
-
+def Brownian(N, sig=1):
+    x = np.zeros(N) 
+    noise = np.random.normal(0,sig,N-1)
+    x[1:] = np.cumsum(noise) # / np.sqrt(N)
+    return x 
 
 
 
@@ -295,6 +301,12 @@ class Algorithms():
     """
     def __init__(self, seed):
         self.seed = seed 
+
+    def Brownian(self, N, sig=1):
+        x = np.zeros(N) 
+        noise = np.random.normal(0,sig,N-1)
+        x[1:] = np.cumsum(noise) 
+        return x 
 
     def midpoint2D(self, maxlevel, sigma, H):
         return nb_midpoint2D(maxlevel, sigma, H)
@@ -351,9 +363,23 @@ class Algorithms():
 
         X = np.real(np.fft.fft2(A))
         return X 
+    
+    def verify_statistics(self, K, level, H, sig=1, bounds=[0,1], nbins=10):
+        """ Verify that the implementations of fBm are statistically sound """ 
+        # Initialize
+        L = 2**level 
+        # Allocate
+        Var = np.zeros((K,nbins))
+        for k in range(K):
+            # Generate fBm 
+            X = self.spectral_synthesis2D(level, H, sig=sig, bounds=bounds)
+            variogram, distance_ax = nb_getvariogram(X, min(1000,2**level), nbins)
+            Var[k,:] = variogram
+        
+        return np.mean(Var,axis=0), distance_ax
+            
 
-    def getVariance2D(self, Z):
-        nb_getVariance2D(Z)
+
 
 
 if __name__ == "__main__":
@@ -361,8 +387,8 @@ if __name__ == "__main__":
     sigma = 1 
     H = 0.9
     import matplotlib.pyplot as plt 
-    X = nb_midpoint1D(maxlevel, sigma, H)
-    X = nb_spectral_synthesis2D(2**maxlevel, H)
+    # X = nb_midpoint1D(maxlevel, sigma, H)
+    # X = nb_spectral_synthesis2D(2**maxlevel, H)
     fig, ax = plt.subplots(1,1, figsize=(5,3.5), tight_layout=True)
     Xplot = npmat.repmat(X, 3, 3) 
     L = 2**maxlevel

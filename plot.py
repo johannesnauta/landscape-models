@@ -91,19 +91,35 @@ class Plotter():
     
     def plot_variance(self, args):
         # Load data
-        suffix = "landscape_%ix%i_H%.3f"%(2**args.maxlevel, 2**args.maxlevel, args.H)
-        Z = np.load(args.ddir+"%s.npy"%(suffix))
-        K = int(1e6)
-        nbins = 30
+        name = "standard_Brownian"
+        N = 2**args.maxlevel
+        # suffix = "landscape_%s_%ix%i_H%.3f_seed%i"%(name, N, N, args.H, args.seed)
+        # Z = np.load(args.ddir+"%s.npy"%(suffix))
+        # nseeds = 1000
+        # xax = np.arange(100)
+        # Mean = np.zeros((len(xax), nseeds))
+        # Var = np.zeros((len(xax), nseeds))
+        # for i, dx in enumerate(xax):
+        #     for seed in range(nseeds):
+        #         Z = src.fBm.Brownian(N)
+        #         Mean[i,seed], Var[i,seed] = src.fBm.nb_sanity_check(Z, 1000, dx)
+        # Mean = np.mean(Mean, axis=1)
+        # Var = np.mean(Var, axis=1)
+        suffix = "_%i_H%.3f"%(2**args.maxlevel, args.H)
+        Var = np.load(args.ddir+"variogram%s.npy"%(suffix))
+        xax = np.load(args.ddir+"distance_ax%s.npy"%(suffix))
+
+        # K = int(1e4)
+        # nbins = 30
 
         # Define the fit 
         def fBm_Variance(d, A):
-            return A*d**(2*args.H)
+            return A*d**(1*args.H)
 
-        # Compute variogram
-        Var = src.fBm.nb_getvariogram(Z, K, nbins)
-        xax = np.linspace(0, Z.shape[0]/np.sqrt(2), num=nbins)
-        # Compute fit 
+        # # Compute variogram
+        # Var = src.fBm.nb_getvariogram(Z, K, nbins)
+        # xax = np.linspace(0, Z.shape[0]/np.sqrt(2), num=nbins)
+        # # Compute fit 
         popt, pcov = curve_fit(fBm_Variance, xax, Var)
         A = popt
         print(A, pcov)
@@ -114,6 +130,15 @@ class Plotter():
             xax, Var, color='k', marker='o', mfc='white', 
             linestyle='none', markersize=3
         )
+        # ax.plot(
+        #     xax, Mean, color='k', marker='s', mfc='white', 
+        #     linestyle='--', markersize=3
+        # )
+        # ax.plot(
+        #     xax, Var, color='k', marker='o', mfc='white', 
+        #     linestyle='none', markersize=3
+        # )
+        xax = np.linspace(0, np.max(xax), 5*len(xax))
         ax.plot(
             xax, fBm_Variance(xax, A), color='k',
             label=r"$f(t-s) \propto (t-s)^{2H}$"
@@ -131,9 +156,9 @@ if __name__ == "__main__":
 
     # Plot 
     Pjotr = Plotter()
-    Pjotr.plot_landscapes(args)
+    # Pjotr.plot_landscapes(args)
     # Pjotr.plot_periodiclandscape(args)
-    # Pjotr.plot_variance(args)
+    Pjotr.plot_variance(args)
 
     # Save or show 
     if args.save: 

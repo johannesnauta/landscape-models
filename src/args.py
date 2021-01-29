@@ -8,7 +8,7 @@ class Args():
         ## Add arguments
         # Algorithm variables
         parser.add_argument(
-            '--m', dest='maxlevel', type=int, default=8,
+            '--m', dest='maxlevel', type=int, default=7,
             help='maximum level of resolution as N=2**maxlevel'
         )
         parser.add_argument(
@@ -20,7 +20,11 @@ class Args():
         )
         # Random number variables
         parser.add_argument(
-            '--seed', dest='seed', type=int, default=420
+            '--seed', dest='seed', type=int, default=1
+        )
+        parser.add_argument(
+            '--K', dest='K', type=int, default=30,
+            help='number of samples for computing averages'
         )
         # Boolean variables
         parser.add_argument(
