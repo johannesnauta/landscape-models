@@ -19,19 +19,9 @@ if __name__ == "__main__":
     # Initialize time
     starttime = time.time() 
 
-    # @TODO: Make seperate file?
-    Var, distance_ax = fBmAlgs.verify_statistics(args.K, args.maxlevel, args.H, nbins=50)
-    suffix = "_%i_H%.3f"%(2**args.maxlevel, args.H)
-    np.save(args.ddir+"variogram%s"%(suffix), Var)
-    np.save(args.ddir+"distance_ax%s"%(suffix), distance_ax)
-    exit()
-
-
     # Compute 2D fractional Brownian motion 
-    Z = fBmAlgs.Brownian(2**args.maxlevel) 
     # Z = fBmAlgs.midpointPBC2D(args.maxlevel, args.sigma, args.H)
-    # Z = fBmAlgs.spectral_synthesis2D(args.maxlevel, args.H, args.sigma)
-    name = "standard_Brownian"
+    Z = fBmAlgs.spectral_synthesis2D(args.maxlevel, args.H, args.sigma)
     computation_time = time.time() - starttime 
     print(
         "Computation finished for %(N)ix%(N)i lattice with H=%(Hurst).3f, \
@@ -41,6 +31,7 @@ if __name__ == "__main__":
     )
     # Save 
     if args.save:
+        name = "spectral_synthesis2D"
         suffix = "landscape_%s_%ix%i_H%.3f_seed%i"%(
             name, 2**args.maxlevel, 2**args.maxlevel, args.H, args.seed
         )

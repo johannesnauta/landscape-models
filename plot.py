@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 # Import modules
 import src.args 
 import src.fBm
+import src.stats 
 
 # Set plotting font for TeX labels
 plt.rc('text', usetex=True)
@@ -87,58 +88,62 @@ class Plotter():
         ax.set_xticks([0,L,2*L,3*L]);    ax.set_xticklabels([r'0', r'L', r'2L', r'3L'])
         ax.set_yticks([0,L,2*L,3*L]);    ax.set_yticklabels([r'' , r'L', r'2L', r'3L'])
 
+    def plot_variance1D(self, args):
+        """ Plot the variance of a 1D Brownian motion """ 
+        # Instantiate objects
+        Alg = src.fBm.Algorithms(args.seed) 
+        # Allocate
+        Var = np.zeros(args.nbins)
+        # Initialize 
+        N = 2**args.maxlevel
+        for n in range(args.n): 
+            # Generate Brownian motion 
+            X = Alg.Brownian(N)
+            Var_, Dist = src.stats.nb_getvariance(X, args.nbins, args.K)
+            Var += Var_ 
+        Var /= args.n 
+        # Initialize figure 
+        fig, ax = plt.subplots(1,1, figsize=(5,2.5), tight_layout=True)
+        ax.plot(
+            Dist, Var, color='k', marker='o', linestyle='none', mfc='white',
+            markersize=3
+        )
+        # Define the fit 
+        def fBm_Variance(d, A):
+            return A*d
+        # Compute best fit
+        popt, pcov = curve_fit(fBm_Variance, Dist, Var)
+        A = popt
+        print(A)
+        ax.plot(
+            Dist, fBm_Variance(Dist, A), color='k',
+            label=r"$f(t-s) \propto (t-s)^{2H}$"
+        )
+
 
     
-    def plot_variance(self, args):
+    def plot_variogram2D(self, args):
         # Load data
-        name = "standard_Brownian"
         N = 2**args.maxlevel
-        # suffix = "landscape_%s_%ix%i_H%.3f_seed%i"%(name, N, N, args.H, args.seed)
-        # Z = np.load(args.ddir+"%s.npy"%(suffix))
-        # nseeds = 1000
-        # xax = np.arange(100)
-        # Mean = np.zeros((len(xax), nseeds))
-        # Var = np.zeros((len(xax), nseeds))
-        # for i, dx in enumerate(xax):
-        #     for seed in range(nseeds):
-        #         Z = src.fBm.Brownian(N)
-        #         Mean[i,seed], Var[i,seed] = src.fBm.nb_sanity_check(Z, 1000, dx)
-        # Mean = np.mean(Mean, axis=1)
-        # Var = np.mean(Var, axis=1)
-        suffix = "_%i_H%.3f"%(2**args.maxlevel, args.H)
-        Var = np.load(args.ddir+"variogram%s.npy"%(suffix))
-        xax = np.load(args.ddir+"distance_ax%s.npy"%(suffix))
-
-        # K = int(1e4)
-        # nbins = 30
+        suffix = "_%ix%i_H%.3f"%(N, N, args.H)
+        Var = np.load(args.ddir+"variogram_spectral_synthesis2D%s.npy"%(suffix))
+        meanVar = np.mean(Var, axis=1) #**(2*args.H)
+        delta = np.load(args.ddir+"distances%s.npy"%(suffix))
 
         # Define the fit 
         def fBm_Variance(d, A):
-            return A*d**(1*args.H)
-
-        # # Compute variogram
-        # Var = src.fBm.nb_getvariogram(Z, K, nbins)
-        # xax = np.linspace(0, Z.shape[0]/np.sqrt(2), num=nbins)
-        # # Compute fit 
-        popt, pcov = curve_fit(fBm_Variance, xax, Var)
+            return A*d**(2*args.H)
+        popt, pcov = curve_fit(fBm_Variance, delta, meanVar)
         A = popt
         print(A, pcov)
         
         # Plot
         fig, ax = plt.subplots(1,1, figsize=(5,3.5), tight_layout=True)
         ax.plot(
-            xax, Var, color='k', marker='o', mfc='white', 
+            delta, meanVar, color='k', marker='o', mfc='white', 
             linestyle='none', markersize=3
         )
-        # ax.plot(
-        #     xax, Mean, color='k', marker='s', mfc='white', 
-        #     linestyle='--', markersize=3
-        # )
-        # ax.plot(
-        #     xax, Var, color='k', marker='o', mfc='white', 
-        #     linestyle='none', markersize=3
-        # )
-        xax = np.linspace(0, np.max(xax), 5*len(xax))
+        xax = np.linspace(0, np.max(delta), 10*len(delta))
         ax.plot(
             xax, fBm_Variance(xax, A), color='k',
             label=r"$f(t-s) \propto (t-s)^{2H}$"
@@ -158,7 +163,8 @@ if __name__ == "__main__":
     Pjotr = Plotter()
     # Pjotr.plot_landscapes(args)
     # Pjotr.plot_periodiclandscape(args)
-    Pjotr.plot_variance(args)
+    # Pjotr.plot_variance1D(args)
+    Pjotr.plot_variogram2D(args)
 
     # Save or show 
     if args.save: 

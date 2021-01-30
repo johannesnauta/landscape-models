@@ -8,7 +8,7 @@ class Args():
         ## Add arguments
         # Algorithm variables
         parser.add_argument(
-            '--m', dest='maxlevel', type=int, default=7,
+            '--m', dest='maxlevel', type=int, default=9,
             help='maximum level of resolution as N=2**maxlevel'
         )
         parser.add_argument(
@@ -22,9 +22,18 @@ class Args():
         parser.add_argument(
             '--seed', dest='seed', type=int, default=1
         )
+        # Plotting variables 
         parser.add_argument(
-            '--K', dest='K', type=int, default=30,
+            '--n', dest='n', type=int, default=100,
+            help='number of different landscapes to generate'
+        )
+        parser.add_argument(
+            '--K', dest='K', type=int, default=200,
             help='number of samples for computing averages'
+        )
+        parser.add_argument(
+            '--nbins', dest='nbins', type=int, default=25,
+            help='number of different distances at which to compute absolute difference'
         )
         # Boolean variables
         parser.add_argument(
