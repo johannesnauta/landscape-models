@@ -188,7 +188,7 @@ class Algorithms():
     def midpointPBC2D(self, maxlevel, sigma, H):
         return nb_midpointPBC2D(maxlevel, sigma, H)
 
-    def spectral_synthesis1D(self, N, H):
+    def circulant_embedding1D(self, N, H):
         """ Generates fractal Brownian motion in 1D, using circulant embedding approach
             see: Kroese & Botev (2015), Spatial process generation
             (https://arxiv.org/pdf/1308.0399v1.pdf)
@@ -207,10 +207,69 @@ class Algorithms():
         # Rescale 
         W = N**(-H) * np.cumsum(np.real(W))
         return W 
+    
+    def circulant_embedding2D(self, level, H, sig=1, bounds=[0,2]):
+        """ Generate fractional Brownian motion in 2D using circulant embedding approach 
+        """
+        R = bounds[1] - bounds[0]       # Size of the grid
+        N = 2**level                    # Number of lattice points
+
+        # Embedding 
+        def rho(x, y, R, alpha):
+            if alpha <= 1.5:
+                beta = 0 
+                c2 = alpha/2 
+                c0 = 1 - alpha/2 
+            else:
+                beta = alpha*(2-alpha) / (3*R*(R**2-1)) 
+                c2 = (alpha-beta*(R-1)**2*(R+2)) / 2 
+                c0 = beta*(R-1)**3 + 1 - c2
+            # Create continuous isotropic function 
+            r = np.sqrt(np.sum( (x-y)**2 ))
+            if r <= 1:
+                out = c0 - r**alpha + c2*r**2 
+            elif r<= R:
+                out = beta*(R-r)**3 / r 
+            else:
+                out = 0 
+            return out, c0, c2
+        # Generate rows
+        tx = np.linspace(1,N,num=N) / N*R
+        ty = np.linspace(1,N,num=N) / N*R
+        Rows = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                Rows[j,i], _, _ = rho(np.array([tx[i],tx[j]]), np.array([tx[0],ty[0]]), R, 2*H)
+        # Make circular embedding, i.e. compute block circular matrix
+        rolled1 = np.roll(Rows[:,::-1], -1, axis=1)[:,:-2]         # Magic statement 1
+        rolled2 = np.roll(Rows[::-1,:], -1, axis=0)[:-2,:]         # Magic statement 2 
+        rolled3 = np.roll(rolled2[:,::-1],-1)[:,:-2]               # Magic statement 3
+        B1 = np.concatenate((Rows, rolled1), axis=1)
+        B2 = np.concatenate((rolled2, rolled3), axis=1)
+        B = np.concatenate((B1,B2), axis=0)
+        # Compute eigenvalues
+        lambda_ = np.real(np.fft.fft2(B)) / (4*(N-1)**2)
+        lambda_ = np.sqrt(lambda_)
+        # Generate Rows with covariance given by block circular matrix
+        Z = np.random.normal(0,sig,size=(2*(N-1),2*(N-1))) + \
+            1j*(np.random.normal(0,sig,size=(2*(N-1),2*(N-1))))
+        F = np.fft.fft2(lambda_*Z)[:N,:N]
+        field = np.real(F)
+        # Set field zero at origin
+        field = field - field[0,0]
+        # Make correction for embedding 
+        out, c0, c2 = rho(np.array([0,0]), np.array([0,0]), R, 2*H)
+        kron_ = np.kron(ty*np.random.random(), tx*np.random.random()).reshape(N,N)
+        field = field + kron_*np.sqrt(2*c2)
+        return field
+
+
+
 
     def spectral_synthesis2D(self, level, H, sig=1, bounds=[0,1]):
         """ Generates fractional Brownian motion in 2D 
             For details on the algorithm, see: Saupe, 1988, Algorithms for random fractals
+            @TODO: Insert relevant comments when fully understood
         """
         N = 2**level
         A = np.zeros((N,N), dtype=np.cdouble)
@@ -259,7 +318,8 @@ class Algorithms():
 if __name__ == "__main__":
     maxlevel = 7
     sigma = 1 
-    H = 0.9
+    H = 0.15
+    Algs = Algorithms(42)
     import matplotlib.pyplot as plt 
     # X = nb_midpoint1D(maxlevel, sigma, H)
     # X = nb_spectral_synthesis2D(2**maxlevel, H)

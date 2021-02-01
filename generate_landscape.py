@@ -22,6 +22,7 @@ if __name__ == "__main__":
     # Compute 2D fractional Brownian motion 
     # Z = fBmAlgs.midpointPBC2D(args.maxlevel, args.sigma, args.H)
     Z = fBmAlgs.spectral_synthesis2D(args.maxlevel, args.H, args.sigma)
+    # Z = fBmAlgs.circulant_embedding2D(args.maxlevel, args.H)
     computation_time = time.time() - starttime 
     print(
         "Computation finished for %(N)ix%(N)i lattice with H=%(Hurst).3f, \
@@ -31,6 +32,7 @@ if __name__ == "__main__":
     )
     # Save 
     if args.save:
+        # name = "circulant_embedding2D"
         name = "spectral_synthesis2D"
         suffix = "landscape_%s_%ix%i_H%.3f_seed%i"%(
             name, 2**args.maxlevel, 2**args.maxlevel, args.H, args.seed
